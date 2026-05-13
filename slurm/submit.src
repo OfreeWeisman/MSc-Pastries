@@ -1,0 +1,27 @@
+#!/bin/bash
+#SBATCH --array=1-264
+#SBATH --mem=16GB
+#SBATCH -n 8
+#SBATCH -N 1
+#SBATCH -J LALA
+#SBATCH -o /home/shaharpit/Personal/LalaPaper/results/outputs/run_%a.out
+#SBATCH -e /home/shaharpit/Personal/LalaPaper/results/errors/run_%a.out
+
+
+cd /home/shaharpit/Personal/LalaPaper/scripts
+args_file=/home/shaharpit/Personal/LalaPaper/slurm/arguments.txt
+
+# get the i-th line of the param file
+params=$(sed -n "$SLURM_ARRAY_TASK_ID"p "$args_file")
+echo $params
+# splits line by ',' to get params
+python_path=$(echo "$params" | cut -d ' ' -f 1)
+echo $python_path
+property=$(echo "$params" | cut -d ' ' -f 2)
+model=$(echo "$params" | cut -d ' ' -f 3)
+rep=$(echo "$params" | cut -d ' ' -f 4)
+test_size=$(echo "$params" | cut -d ' ' -f 5)
+
+echo "index = $SLURM_ARRAY_TASK_ID" 
+echo "$python_path ../scripts/run.py $model $rep $property $test_size"
+$python_path ../scripts/run.py $model $rep $property $test_size

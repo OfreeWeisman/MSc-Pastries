@@ -1,0 +1,22 @@
+# ignore python compiled / optimized files
+__pycache__/
+*.py[cod]
+results/
+
+# ignore vscode settigns
+.vscode/
+
+# local virtual environments
+.venv/
+venv/
+
+# COMPAS-derived xyz files (reproducible via scripts/compas2lalas.py)
+examples/compas/
+
+# GitHub rejects blobs > 100MB; keep these local or use Git LFS if you must version them
+data/compas-2x.csv
+examples/compas-2D.sdf
+
+# lfv_code generated / large CSV outputs
+lfv_code/*.csv
+lfv_code/**/*.csv
