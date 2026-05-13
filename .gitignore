@@ -10,12 +10,8 @@ results/
 .venv/
 venv/
 
-# COMPAS-derived xyz files (reproducible via scripts/compas2lalas.py)
-examples/compas/
-
-# GitHub rejects blobs > 100MB; keep these local or use Git LFS if you must version them
-data/compas-2x.csv
-examples/compas-2D.sdf
+examples/
+data/
 
 # lfv_code generated / large CSV outputs
 lfv_code/*.csv
