@@ -61,13 +61,9 @@ def canonical_heteroatom_tokens(paths, edges, knots, graph, all_atoms,
     if not canonical:
         return {}
 
-    # LALAS's get_rotation uses cross(a-b, c-b), the opposite sign of the
-    # standard turn-at-b cross product cross(b-a, c-b). Net effect: LALAS
-    # annulation 'A' (label "clockwise") corresponds to a math-CCW turn in
-    # the aligned coords, and 'a' ("counter-clockwise") to a math-CW turn.
-    # So the math direction we walk a ring in is the OPPOSITE of the
-    # chirality label. Truly ambiguous (after ring-type tiebreak) keeps the
-    # math-CW default.
+    # SDF inputs use explicit bonds to define each ring's cyclic atom order,
+    # but the direction around that order is still the global chirality
+    # direction selected by the LALAS canonical traversal.
     direction = 'CCW' if chir_label == 'clockwise' else 'CW'
 
     parent_map = _build_parent_map(canonical)
@@ -171,11 +167,64 @@ def _first_other_ring(canonical, this_idx):
 
 def _cyclic_order(ring_atoms, cx, cy, direction):
     """
-    Sort ring atoms by polar angle around ``(cx, cy)``. ``atan2`` ascending
-    gives CCW (math convention); reverse for CW.
+    Return ring atoms in cyclic order. Prefer explicit SDF bonds when the
+    atoms carry them; fall back to polar-angle sorting for xyz inputs.
     """
+    ordered = _bond_cyclic_order(ring_atoms, direction)
+    if ordered is not None:
+        return ordered
+
     by_angle = sorted(ring_atoms, key=lambda a: math.atan2(a.y - cy, a.x - cx))
     return list(reversed(by_angle)) if direction == 'CW' else by_angle
+
+
+def _bond_cyclic_order(ring_atoms, direction):
+    ring_ids = {a.index for a in ring_atoms}
+    atom_by_id = {a.index: a for a in ring_atoms}
+    adjacency = {}
+    for atom in ring_atoms:
+        neighbours = [
+            idx for idx in getattr(atom, 'bonded_atom_indices', ())
+            if idx in ring_ids
+        ]
+        if len(neighbours) != 2:
+            return None
+        adjacency[atom.index] = sorted(neighbours)
+
+    start = min(ring_ids)
+    prev = None
+    current = start
+    ordered_ids = []
+    while True:
+        ordered_ids.append(current)
+        choices = [idx for idx in adjacency[current] if idx != prev]
+        if not choices:
+            return None
+        nxt = choices[0]
+        if nxt == start:
+            break
+        if nxt in ordered_ids:
+            return None
+        prev, current = current, nxt
+        if len(ordered_ids) > len(ring_atoms):
+            return None
+
+    if len(ordered_ids) != len(ring_atoms):
+        return None
+
+    ordered = [atom_by_id[idx] for idx in ordered_ids]
+    area = _signed_area(ordered)
+    if (direction == 'CCW' and area < 0) or (direction == 'CW' and area > 0):
+        ordered.reverse()
+    return ordered
+
+
+def _signed_area(ordered):
+    area = 0.0
+    for i, atom in enumerate(ordered):
+        nxt = ordered[(i + 1) % len(ordered)]
+        area += atom.x * nxt.y - nxt.x * atom.y
+    return area
 
 
 def _pick_atom_zero(ordered, fusion_atoms):

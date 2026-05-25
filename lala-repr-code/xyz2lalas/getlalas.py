@@ -350,8 +350,7 @@ def filter_sequences(_sequences):
                 if len(filter_5) == 1:
                     return filter_5[0]
                 else:
-                    print(f'Error. 2 options possible after last filtering step: {filter_5}')
-                    return filter_5[0]
+                    return min(filter_5, key=lambda seq: "".join(map(str, seq)))
 
 def longestPath(root):
 

@@ -125,15 +125,17 @@ def _resolve(final_seq, raw_sequences, raw_paths_idx, ring_type_for_idx):
         return ('none' if not has_angular else 'unknown'), None, None
 
     if not has_angular:
-        chosen_idx, match_type = _pick_first(direct, inverted)
+        chosen_idx, match_type = _pick_lexicographic(direct, inverted, ring_type_for_idx)
         return 'none', chosen_idx, match_type
 
     if direct and inverted:
         return _resolve_ambiguous(direct, inverted, ring_type_for_idx)
 
     if direct:
-        return 'clockwise', direct[0][0], 'direct'
-    return 'counter-clockwise', inverted[0][0], 'inverted'
+        chosen_idx, _ = _pick_lexicographic(direct, [], ring_type_for_idx)
+        return 'clockwise', chosen_idx, 'direct'
+    chosen_idx, _ = _pick_lexicographic([], inverted, ring_type_for_idx)
+    return 'counter-clockwise', chosen_idx, 'inverted'
 
 
 def _has_angular_annulation(final_seq):
@@ -156,6 +158,19 @@ def _pick_first(direct, inverted):
     return inverted[0][0], 'inverted'
 
 
+def _pick_lexicographic(direct, inverted, ring_type_for_idx):
+    if ring_type_for_idx is None:
+        return _pick_first(direct, inverted)
+
+    candidates = (
+        [(_ring_seq(p, ring_type_for_idx), i, 'direct') for i, p in direct] +
+        [(_ring_seq(p, ring_type_for_idx), i, 'inverted') for i, p in inverted]
+    )
+    candidates.sort(key=lambda m: m[0])
+    _, chosen_idx, match_type = candidates[0]
+    return chosen_idx, match_type
+
+
 def _resolve_ambiguous(direct, inverted, ring_type_for_idx):
     """
     Break a direct/inverted tie using ring-type sequences. Without a
@@ -166,22 +181,23 @@ def _resolve_ambiguous(direct, inverted, ring_type_for_idx):
     if ring_type_for_idx is None:
         return 'ambiguous', direct[0][0], 'direct'
 
-    def ring_seq(path):
-        return tuple(ring_type_for_idx(k) for k in path)
-
-    direct_seqs = sorted(ring_seq(p) for _, p in direct)
-    inverted_seqs = sorted(ring_seq(p) for _, p in inverted)
+    direct_seqs = sorted(_ring_seq(p, ring_type_for_idx) for _, p in direct)
+    inverted_seqs = sorted(_ring_seq(p, ring_type_for_idx) for _, p in inverted)
     if direct_seqs == inverted_seqs:
         return 'ambiguous', direct[0][0], 'direct'
 
     candidates = (
-        [(ring_seq(p), i, 'direct') for i, p in direct] +
-        [(ring_seq(p), i, 'inverted') for i, p in inverted]
+        [(_ring_seq(p, ring_type_for_idx), i, 'direct') for i, p in direct] +
+        [(_ring_seq(p, ring_type_for_idx), i, 'inverted') for i, p in inverted]
     )
     candidates.sort(key=lambda m: m[0])
     _, chosen_idx, match_type = candidates[0]
     label = 'clockwise' if match_type == 'direct' else 'counter-clockwise'
     return label, chosen_idx, match_type
+
+
+def _ring_seq(path, ring_type_for_idx):
+    return tuple(ring_type_for_idx(k) for k in path)
 
 
 def _get_index_sequence(path, current_node):

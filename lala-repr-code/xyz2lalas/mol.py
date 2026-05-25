@@ -21,6 +21,12 @@ class Mol:
             self.atoms.append(Atom(i, atom[0], atom[1], atom[2], atom[3]))
             i += 1
         self.bonds = _normalise_bonds(_bonds) if _bonds else None
+        for atom in self.atoms:
+            atom.bonded_atom_indices = set()
+        if self.bonds:
+            for i, j in self.bonds:
+                self.atoms[i].bonded_atom_indices.add(j)
+                self.atoms[j].bonded_atom_indices.add(i)
 
 
     def __str__(self):
