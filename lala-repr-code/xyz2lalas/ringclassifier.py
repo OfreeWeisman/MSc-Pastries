@@ -42,18 +42,18 @@ __all__ = [
 
 _RING_TYPES = {
     # (ring_size, heteroatom composition) -> name
-    (6, ()):                    'Bn',
-    (6, (('N', 1),)):           'Pd',
-    (6, (('N', 2),)):           'Pz',
-    (6, (('B', 1),)):           'Bz',
-    (6, (('B', 2),)):           'DBn',  # generic; refined when geometry is given
+    (6, ()):                    'ben',
+    (6, (('N', 1),)):           'pyd',
+    (6, (('N', 2),)):           'pyz',
+    (6, (('B', 1),)):           'brn',
+    (6, (('B', 2),)):           'dbrn',  # generic; refined when geometry is given
 
-    (5, (('B', 1),)):           'Bl',
-    (5, (('N', 1),)):           'Py',
-    (5, (('O', 1),)):           'Fu',
-    (5, (('S', 1),)):           'Th',
+    (5, (('B', 1),)):           'bor',
+    (5, (('N', 1),)):           'pyl',
+    (5, (('O', 1),)):           'fur',
+    (5, (('S', 1),)):           'thi',
 
-    (4, ()):                    'Cbd',
+    (4, ()):                    'cbd',
 }
 
 
@@ -136,7 +136,7 @@ def _classify_diborinine_variant(knot, all_atoms, covalency_factor):
         _count_attached_h(b, all_atoms, covalency_factor) == 1
         for b in b_atoms
     )
-    return 'DhDBn' if each_b_has_one_h else 'DBn'
+    return 'dhdb' if each_b_has_one_h else 'dbrn'
 
 
 def _count_attached_h(ring_atom, all_atoms, covalency_factor):

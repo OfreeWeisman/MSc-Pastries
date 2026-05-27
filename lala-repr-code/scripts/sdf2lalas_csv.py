@@ -103,7 +103,8 @@ def lalas_representation(atoms, bonds=None):
 
 def generate_representations_csv(sdf_path: Path, out_csv: Path,
                                  charge_value: str = "0",
-                                 limit: int | None = None) -> int:
+                                 limit: int | None = None,
+                                 resume: bool = False) -> int:
     """
     Iterate the SDF, keep only records whose ``charge`` data field matches
     ``charge_value``, compute the LALAS representation, and stream the result
@@ -113,21 +114,39 @@ def generate_representations_csv(sdf_path: Path, out_csv: Path,
     """
     out_csv.parent.mkdir(parents=True, exist_ok=True)
 
+    existing_names: set[str] = set()
+    write_header = True
+    mode = "w"
+    if resume and out_csv.is_file():
+        with open(out_csv, "r", newline="", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            if reader.fieldnames is None or "name" not in reader.fieldnames:
+                raise SystemExit(f"cannot resume; reps CSV missing name column: {out_csv}")
+            for row in reader:
+                existing_names.add(row["name"])
+        write_header = False
+        mode = "a"
+        print(f"# generate: resuming {out_csv}; found {len(existing_names)} existing rows",
+              flush=True)
+
     n_kept = 0
     n_failed = 0
     n_records = 0
     n_charge_match = 0
     start = time.time()
 
-    with open(out_csv, "w", newline="", encoding="utf-8") as f:
+    with open(out_csv, mode, newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
-        writer.writerow(["name", "representation"])
+        if write_header:
+            writer.writerow(["name", "representation"])
 
         for record_id, data, atoms, bonds in iter_sdf(sdf_path):
             n_records += 1
             if data.get("charge", "").strip() != charge_value:
                 continue
             n_charge_match += 1
+            if record_id in existing_names:
+                continue
 
             if limit is not None and (n_kept + n_failed) >= limit:
                 break
@@ -270,6 +289,9 @@ def main():
                              "existing reps CSV with the features CSV.")
     parser.add_argument("--skip-merge", action="store_true",
                         help="Only generate the reps CSV; do not merge.")
+    parser.add_argument("--resume", action="store_true",
+                        help="Append missing representation rows to an existing "
+                             "reps CSV instead of overwriting it.")
     args = parser.parse_args()
 
     sdf = Path(args.sdf).expanduser()
@@ -283,7 +305,8 @@ def main():
             raise SystemExit(f"SDF not found: {sdf}")
         generate_representations_csv(sdf, rep_csv,
                                      charge_value=args.charge,
-                                     limit=args.limit)
+                                     limit=args.limit,
+                                     resume=args.resume)
 
     if not args.skip_merge:
         if not rep_csv.is_file():
