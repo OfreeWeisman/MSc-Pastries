@@ -37,6 +37,7 @@ __all__ = [
     'classify_ring',
     'canonical_ring_sequence',
     'print_canonical_ring_sequence',
+    'ring_sequence_tokens',
 ]
 
 
@@ -102,17 +103,26 @@ def canonical_ring_sequence(paths, edges, knots, graph,
         paths, edges, knots, graph, ring_type_for_idx=names_by_index.get)
     decorations = heteroindex.canonical_heteroatom_tokens(
         paths, edges, knots, graph, all_atoms, covalency_factor)
+    tokens = ring_sequence_tokens(indices, names_by_index.get, decorations)
+    return ",".join(tokens).replace("(,", "(").replace(",)", ")")
 
-    rendered = []
+
+def ring_sequence_tokens(indices, name_for, decorations):
+    """
+    One token per traversal item: ``"<name>[<positions>]"`` (or the bare
+    name for carbon-only rings) for each knot index, and '(' / ')' as-is.
+    ``name_for(idx)`` gives the ring-type name and ``decorations`` maps a
+    knot index to its heteroatom token.
+    """
+    tokens = []
     for item in indices:
         if not isinstance(item, int):
-            rendered.append(item)
+            tokens.append(item)
             continue
-        name = names_by_index[item]
+        name = name_for(item)
         deco = decorations.get(item)
-        rendered.append(f"{name}[{deco}]" if deco else name)
-
-    return ",".join(rendered).replace("(,", "(").replace(",)", ")")
+        tokens.append(f"{name}[{deco}]" if deco else name)
+    return tokens
 
 
 def print_canonical_ring_sequence(paths, edges, knots, graph,
@@ -141,9 +151,20 @@ def _classify_diborinine_variant(knot, all_atoms, covalency_factor):
 
 def _count_attached_h(ring_atom, all_atoms, covalency_factor):
     """
-    Number of H atoms covalently bonded to ``ring_atom``, using the same
-    covalent-radii cutoff as the rest of the pipeline.
+    Number of H atoms bonded to ``ring_atom``.
+
+    Prefers the explicit bond graph (``bonded_atom_indices``, populated
+    from the input's connectivity table when one was supplied, e.g. an SDF
+    bond block) since it is exact. Falls back to a geometric covalent-radii
+    distance cutoff only when no explicit bonds are available (e.g. a bare
+    xyz geometry) - that heuristic can over-count in fused/curved ring
+    systems where an unbonded H happens to sit within the cutoff distance
+    of a boron it is not attached to.
     """
+    bonded = getattr(ring_atom, 'bonded_atom_indices', None)
+    if bonded:
+        return sum(1 for i in bonded if all_atoms[i].element == 'H')
+
     h_radius = __COV_RADII__['H']
     base_radius = __COV_RADII__[ring_atom.element]
     cutoff_sq = ((base_radius + h_radius) * covalency_factor) ** 2

@@ -15,8 +15,9 @@ and ``n-1``, so the shared edge sits at the wrap-around ``(n-1) -> 0``.
 Atom 0 is chosen so that its direction-next neighbour in the cyclic
 ordering is NOT the other fusion atom.
 
-Numbering direction is the OPPOSITE of the chirality label - see the note
-in ``canonical_heteroatom_tokens`` for why.
+Numbering direction is the OPPOSITE of the chirality label; for 'none' /
+'ambiguous' labels the direction giving the lex-smallest tokens is used
+(see ``tokens_for_traversal``).
 
 Output: per heteroatom-bearing ring, a single token of the form
 ``"ELEMENT:i,j[,ELEMENT2:k,...]"`` (elements sorted alphabetically,
@@ -37,7 +38,11 @@ from . import chirality
 from . import ringclassifier
 
 
-__all__ = ['canonical_heteroatom_tokens']
+__all__ = ['canonical_heteroatom_tokens', 'tokens_for_traversal']
+
+# Heteroatom numbering direction for a chirality label (the opposite of it).
+# Labels not listed ('none', 'ambiguous') leave the direction open.
+_DIRECTION_FOR_LABEL = {'clockwise': 'CCW', 'counter-clockwise': 'CW'}
 
 
 def canonical_heteroatom_tokens(paths, edges, knots, graph, all_atoms,
@@ -58,14 +63,36 @@ def canonical_heteroatom_tokens(paths, edges, knots, graph, all_atoms,
         paths, edges, knots, graph,
         ring_type_for_idx=names_by_index.get,
         with_indices=True)
+    return tokens_for_traversal(canonical, knots, chir_label)
+
+
+def tokens_for_traversal(canonical, knots, chir_label):
+    """
+    Return ``{ring_knot_index: token}`` for a given traversal (knot indices
+    interspersed with '(' / ')') and chirality label. Used both for the
+    canonical traversal and for rendering tied candidate traversals.
+
+    'clockwise' / 'counter-clockwise' fix the numbering direction. For
+    'none' / 'ambiguous' the geometry does not, so both directions are
+    tried and the lex-smallest token sequence (in traversal order) wins -
+    otherwise a molecule and its mirror image would be numbered differently.
+    """
     if not canonical:
         return {}
 
     # SDF inputs use explicit bonds to define each ring's cyclic atom order,
     # but the direction around that order is still the global chirality
     # direction selected by the LALAS canonical traversal.
-    direction = 'CCW' if chir_label == 'clockwise' else 'CW'
+    direction = _DIRECTION_FOR_LABEL.get(chir_label)
+    if direction is not None:
+        return _tokens_in_direction(canonical, knots, direction)
 
+    ring_order = [item for item in canonical if isinstance(item, int)]
+    options = [_tokens_in_direction(canonical, knots, d) for d in ('CW', 'CCW')]
+    return min(options, key=lambda tokens: [tokens.get(i, '') for i in ring_order])
+
+
+def _tokens_in_direction(canonical, knots, direction):
     parent_map = _build_parent_map(canonical)
     knot_by_index = {k.index: k for k in knots}
 

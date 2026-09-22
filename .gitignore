@@ -6,6 +6,9 @@ results/
 # ignore vscode settigns
 .vscode/
 
+# ignore pycharm settings
+.idea/
+
 # local virtual environments
 .venv/
 venv/

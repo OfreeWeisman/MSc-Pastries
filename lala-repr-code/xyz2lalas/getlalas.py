@@ -6,6 +6,7 @@ It is a BINARY tree, so it can only branch once each time.
 """
 
 import copy
+import itertools
 import numpy as np
 import pandas as pd
 
@@ -31,7 +32,8 @@ def compute_canonical_sequence(_paths, _edges, _knots, _graph):
     """
     Run the LALAS canonicalisation pipeline.
 
-    For every longest path through the knot graph, build a binary tree, compute
+    For every longest path through the knot graph, build a binary tree (one
+    per ordering of end-ring forks, see ``_layout_variants``), compute
     annulations and the resulting raw sequence. Then expand each raw sequence
     with its inversion, deduplicate, and apply the Balaban-style filter to pick
     the canonical sequence.
@@ -54,14 +56,13 @@ def compute_canonical_sequence(_paths, _edges, _knots, _graph):
 
     for path in find_longest_path(_paths, _graph):
         longest_path = [knot.index for knot in path.route]
-        root = Node(longest_path[0])
-        edges_copy = copy.deepcopy(_edges)
-        build_tree(root, edges_copy)
-        get_annulation(root, None, _knots, longest_path)
-
-        raw_sequences.append(get_sequence(longest_path, root))
-        raw_trees.append(root)
-        raw_paths_idx.append(longest_path)
+        base = Node(longest_path[0])
+        build_tree(base, copy.deepcopy(_edges))
+        for root in _layout_variants(base, longest_path):
+            get_annulation(root, None, _knots, longest_path)
+            raw_sequences.append(get_sequence(longest_path, root))
+            raw_trees.append(root)
+            raw_paths_idx.append(longest_path)
 
     all_sequences = get_allsequences(raw_sequences)
 
@@ -71,6 +72,38 @@ def compute_canonical_sequence(_paths, _edges, _knots, _graph):
 
     final_seq = filter_sequences(no_duplicates)
     return final_seq, raw_sequences, raw_trees, raw_paths_idx
+
+
+def _layout_variants(root, longest_path):
+    """
+    Return one tree per way of ordering the two end rings at each fork off
+    the longest path (a branch point whose two children are both end rings).
+    ``children[0]`` is written after the branch and ``children[1]`` inside
+    it, so each ordering is a separate candidate traversal and the canonical
+    selection decides between them.
+    """
+    forks = [node.index for node in _walk(root)
+             if node.index not in longest_path
+             and len(node.children) == 2
+             and not any(child.children for child in node.children)]
+    if not forks:
+        return [root]
+
+    variants = []
+    for flips in itertools.product((False, True), repeat=len(forks)):
+        tree = copy.deepcopy(root)
+        nodes = {node.index: node for node in _walk(tree)}
+        for index, flip in zip(forks, flips):
+            if flip:
+                nodes[index].children.reverse()
+        variants.append(tree)
+    return variants
+
+
+def _walk(node):
+    yield node
+    for child in node.children:
+        yield from _walk(child)
 
 
 def format_lalas_strings(final_seq):
@@ -188,7 +221,14 @@ def get_annulation(current_node, previous_node, _knots, _longest_path):
                 for child in current_node.children:
                     get_annulation(child, current_node, _knots, new_main_path)
             elif len(new_main_path) > 1 and longest_path == 0:
-                current_node.annulation = 1
+                # Fork of end rings: children[0] is the one written after the
+                # branch, so the turn towards it decides A/a, as on the main path.
+                if get_rotation(np.array(_knots[previous_node.index].get_coord()),
+                                np.array(_knots[current_node.index].get_coord()),
+                                np.array(_knots[current_node.children[0].index].get_coord())) < 0:
+                    current_node.annulation = 1
+                else:
+                    current_node.annulation = 2
             else: print(f'Degenerate branching point with branches > 1! This case is not handled')
 
         for child in current_node.children:
