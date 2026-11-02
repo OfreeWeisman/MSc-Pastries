@@ -15,6 +15,11 @@ and ``n-1``, so the shared edge sits at the wrap-around ``(n-1) -> 0``.
 Atom 0 is chosen so that its direction-next neighbour in the cyclic
 ordering is NOT the other fusion atom.
 
+Directions refer to the ring orientation of ``topology.ring_orientation``,
+which is shared by all fused rings and defined by the bond graph: 'CCW'
+runs along it, 'CW' against it. For a planar molecule oriented
+counter-clockwise in the xy-plane these are the geometric directions.
+
 Numbering direction is the OPPOSITE of the chirality label (an 'ambiguous'
 label is resolved by the chosen traversal's match type, see
 ``chirality.numbering_label``); for 'none' the direction giving the
@@ -33,10 +38,9 @@ Canonical traversal and chirality direction are both delegated to
 canonicalisation logic.
 """
 
-import math
-
 from . import chirality
 from . import ringclassifier
+from . import topology
 
 
 __all__ = ['canonical_heteroatom_tokens', 'tokens_for_traversal']
@@ -93,11 +97,14 @@ def tokens_for_traversal(canonical, knots, chir_label):
         return _tokens_in_direction(canonical, knots, direction)
 
     ring_order = [item for item in canonical if isinstance(item, int)]
-    options = [_tokens_in_direction(canonical, knots, d) for d in ('CW', 'CCW')]
+    orientation = topology.ring_orientation(knots)
+    options = [_tokens_in_direction(canonical, knots, d, orientation) for d in ('CW', 'CCW')]
     return min(options, key=lambda tokens: [tokens.get(i, '') for i in ring_order])
 
 
-def _tokens_in_direction(canonical, knots, direction):
+def _tokens_in_direction(canonical, knots, direction, orientation=None):
+    if orientation is None:
+        orientation = topology.ring_orientation(knots)
     parent_map = _build_parent_map(canonical)
     knot_by_index = {k.index: k for k in knots}
 
@@ -122,14 +129,14 @@ def _tokens_in_direction(canonical, knots, direction):
             continue
 
         token = _encode_ring_heteroatoms(
-            ring, knot_by_index[anchor_idx], direction)
+            ring, knot_by_index[anchor_idx], direction, orientation)
         if token is not None:
             tokens[item] = token
 
     return tokens
 
 
-def _encode_ring_heteroatoms(ring, anchor_ring, direction):
+def _encode_ring_heteroatoms(ring, anchor_ring, direction, orientation):
     """
     Number ``ring``'s atoms 0..n-1 in the requested cyclic ``direction``,
     starting from a fusion atom with ``anchor_ring`` so the shared edge
@@ -138,7 +145,7 @@ def _encode_ring_heteroatoms(ring, anchor_ring, direction):
     positions ascending), or ``None`` if no valid atom 0 can be picked or
     the ring has no heteroatom.
     """
-    ordered = _cyclic_order(ring.atoms, ring.x, ring.y, direction)
+    ordered = topology.oriented_atoms(orientation, ring, direction)
     fusion_idx_set = (
         {a.index for a in ring.atoms} & {a.index for a in anchor_ring.atoms}
     )
@@ -195,68 +202,6 @@ def _first_other_ring(canonical, this_idx):
         if isinstance(item, int) and item != this_idx:
             return item
     return None
-
-
-def _cyclic_order(ring_atoms, cx, cy, direction):
-    """
-    Return ring atoms in cyclic order. Prefer explicit SDF bonds when the
-    atoms carry them; fall back to polar-angle sorting for xyz inputs.
-    """
-    ordered = _bond_cyclic_order(ring_atoms, direction)
-    if ordered is not None:
-        return ordered
-
-    by_angle = sorted(ring_atoms, key=lambda a: math.atan2(a.y - cy, a.x - cx))
-    return list(reversed(by_angle)) if direction == 'CW' else by_angle
-
-
-def _bond_cyclic_order(ring_atoms, direction):
-    ring_ids = {a.index for a in ring_atoms}
-    atom_by_id = {a.index: a for a in ring_atoms}
-    adjacency = {}
-    for atom in ring_atoms:
-        neighbours = [
-            idx for idx in getattr(atom, 'bonded_atom_indices', ())
-            if idx in ring_ids
-        ]
-        if len(neighbours) != 2:
-            return None
-        adjacency[atom.index] = sorted(neighbours)
-
-    start = min(ring_ids)
-    prev = None
-    current = start
-    ordered_ids = []
-    while True:
-        ordered_ids.append(current)
-        choices = [idx for idx in adjacency[current] if idx != prev]
-        if not choices:
-            return None
-        nxt = choices[0]
-        if nxt == start:
-            break
-        if nxt in ordered_ids:
-            return None
-        prev, current = current, nxt
-        if len(ordered_ids) > len(ring_atoms):
-            return None
-
-    if len(ordered_ids) != len(ring_atoms):
-        return None
-
-    ordered = [atom_by_id[idx] for idx in ordered_ids]
-    area = _signed_area(ordered)
-    if (direction == 'CCW' and area < 0) or (direction == 'CW' and area > 0):
-        ordered.reverse()
-    return ordered
-
-
-def _signed_area(ordered):
-    area = 0.0
-    for i, atom in enumerate(ordered):
-        nxt = ordered[(i + 1) % len(ordered)]
-        area += atom.x * nxt.y - nxt.x * atom.y
-    return area
 
 
 def _pick_atom_zero(ordered, fusion_atoms):

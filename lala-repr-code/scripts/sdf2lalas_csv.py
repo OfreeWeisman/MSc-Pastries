@@ -78,7 +78,6 @@ def lalas_representation(atoms, bonds=None):
     """
     rows = [[el, x, y, z] for (el, x, y, z) in atoms]
     molrepr = mol.Mol(rows, bonds)
-    molrepr.align_to_xy_plane()
 
     knots, _ = knotidentifier.identify(molrepr, COVALENCY_FACTOR)
     if len(knots) < 3:

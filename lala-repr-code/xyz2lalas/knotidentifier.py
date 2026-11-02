@@ -71,6 +71,13 @@ def identify(_molrepr, covalency_factor):
         atom_connectivity = get_connectivity_matrix(_molrepr.atoms, covalency_factor, skip_hydrogen=False)
         edges = get_edges(atom_connectivity)
         edges = _prune_bonds_by_valence(edges, _molrepr.atoms)
+        # Record the inferred bonds on the atoms, as an SDF bond block would,
+        # so ring orientation and annulation (``topology``) work the same way.
+        for atom in _molrepr.atoms:
+            atom.bonded_atom_indices = set()
+        for i, j in edges:
+            _molrepr.atoms[i].bonded_atom_indices.add(j)
+            _molrepr.atoms[j].bonded_atom_indices.add(i)
     graph = nx.Graph()
     graph.add_nodes_from(range(len(_molrepr.atoms))) # keep isolated atoms in the graph so node indices stay aligned
     graph.add_edges_from(edges)

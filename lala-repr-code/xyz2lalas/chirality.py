@@ -3,18 +3,20 @@ Chirality classifier for the canonical LALAS sequence.
 
 Given the same inputs used by ``getlalas.get_LALAS`` (paths, edges, knots,
 graph), this module decides whether the FIRST angular annulation of the
-canonical sequence was clockwise or counter-clockwise in the molecule's
-geometry. The canonical selection itself is reused from getlalas - this
+canonical sequence turns clockwise or counter-clockwise relative to the
+shared ring orientation of ``topology.ring_orientation`` (for a planar
+molecule oriented counter-clockwise in the xy-plane, the geometric sense).
+The canonical selection itself is reused from getlalas - this
 module never alters which sequence is canonical, only which traversal
 direction it corresponds to.
 
 Possible labels:
   'clockwise'         The canonical equals one of the raw (pre-inversion)
-                      sequences; its leading 'A' came from a rotation sign
-                      < 0 in 3D.
+                      sequences; its leading 'A' is a turn read
+                      directly from the ring topology.
   'counter-clockwise' The canonical equals an inverted raw sequence; its
-                      leading 'A' is the mirror of an 'a' that came from a
-                      rotation sign > 0 in 3D.
+                      leading 'A' is the mirror of an 'a' read from the
+                      ring topology.
   'ambiguous'         Both a direct and an inverted raw sequence match the
                       canonical AND - if a ring-type lookup is provided -
                       the ring-type sequences along the two directions are

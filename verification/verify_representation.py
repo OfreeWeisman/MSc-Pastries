@@ -8,15 +8,16 @@ The generator turns a 3D structure into a string such as::
 
 Two independent things can go wrong there, and this script checks one of each.
 
-1. Orientation independence (canonicalisation)
-----------------------------------------------
-Before anything else is computed, ``Mol.align_to_xy_plane`` rotates the molecule
-into the xy-plane using the eigenvectors of its inertia tensor. The sign of
-those eigenvectors is not fixed: the same molecule can come out mirrored on a
-different machine, a different BLAS build, or a different numpy version. A
-mirror image is the same molecule flipped over, so the representation must not
-change - if it does, the output depends on where it was generated and the
-"canonical" representation is not canonical.
+1. Input independence (canonicalisation)
+----------------------------------------
+The representation is computed from the bond graph only (see ``topology.py``):
+no coordinates are used, so a molecule and its mirror image, or the same
+molecule with its atoms listed in another order, must give the same string. If
+it does not, the output depends on how the input file happened to be written and
+the "canonical" representation is not canonical. Atom order is the invariance
+that can actually break: the shared ring orientation is propagated from the
+lowest-numbered ring and atom, and the canonicalisation must make that choice
+irrelevant.
 
 Historically it did change, in two ways, both fixed:
 
@@ -27,9 +28,9 @@ Historically it did change, in two ways, both fixed:
   instead of computed from the geometry, so mirroring turned ``A(A())`` into
   ``A(a())``.
 
-The check mirrors each molecule *after* alignment (negating x in the aligned
-frame, which is an exact mirror) and requires an identical representation.
-Mirroring the raw input instead would not do: the alignment step may undo it.
+(Both date from when annulation was read from the geometry.) The check mirrors
+each molecule and lists its atoms in a random order (bonds renumbered to match),
+and requires an identical representation.
 
 2. Ring content (chemistry)
 ---------------------------
@@ -101,14 +102,15 @@ csv.field_size_limit(min(sys.maxsize, 2_147_483_647))
 def representation(atoms, bonds, mirror=False):
     """
     Build the representation exactly as ``sdf2lalas_csv.lalas_representation``
-    does. With ``mirror=True`` the molecule is mirrored in the aligned frame
-    first, which must not change the result.
+    does. With ``mirror=True`` the molecule is mirrored and its atoms are
+    listed in a random order first, which must not change the result.
     """
-    molrepr = mol.Mol([[element, x, y, z] for element, x, y, z in atoms], bonds)
-    molrepr.align_to_xy_plane()
     if mirror:
-        for atom in molrepr.atoms:
-            atom.x = -atom.x
+        order = random.Random(len(atoms)).sample(range(len(atoms)), len(atoms))
+        new_index = {old: new for new, old in enumerate(order)}
+        atoms = [(atoms[i][0], -atoms[i][1], atoms[i][2], atoms[i][3]) for i in order]
+        bonds = [(new_index[i], new_index[j]) for i, j in bonds]
+    molrepr = mol.Mol([[element, x, y, z] for element, x, y, z in atoms], bonds)
 
     knots, _ = knotidentifier.identify(molrepr, COVALENCY_FACTOR)
     if len(knots) < 3:

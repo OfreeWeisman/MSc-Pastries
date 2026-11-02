@@ -119,7 +119,6 @@ def lalas_representation(atom_rows):
     and return ``(representation, augmented_lalas)``.
     """
     molrepr = mol.Mol(atom_rows)
-    molrepr.align_to_xy_plane()
     knots, _ = knotidentifier.identify(molrepr, COVALENCY_FACTOR)
     if len(knots) < 3:
         raise ValueError(f"only {len(knots)} ring(s); need at least 3")

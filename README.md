@@ -45,32 +45,41 @@ numbering.
    a ring type follows from its size and heteroatom content. The one ambiguous case is the
    six-ring with two borons: `dhdb` when each boron carries an explicit B-H bond, otherwise
    `dbrn`. This uses the bond table, not interatomic distances.
-2. **Smallest LALAS wins.** The canonical annulation string is chosen first, over all
+2. **Annulation letters from the bond graph.** Each ring's letter depends only on which
+   of its bonds are fused to the previous and the next ring. With `n` bonds in the ring and
+   `k` steps from the entry bond to the exit bond: `2k = n` (exit opposite the entry) is
+   `L`, anything else is angular, `A` or `a` by side. The side is read from one ring
+   orientation shared by all fused rings and propagated through the shared bonds. Only the
+   ring size is used, never the ring type, so a 6-ring can be `L` or angular, a 4-ring is
+   always `L`, and a 5-ring always turns. Coordinates are not used, so bent molecules are
+   classified like flat ones; earlier versions measured angles between ring centres, which
+   misread folded `cbd` junctions as angular and some furan/pyrrole junctions as `L`
+   (2.15% of molecules). Out-of-plane bending is therefore not encoded in the string.
+3. **Smallest LALAS wins.** The canonical annulation string is chosen first, over all
    longest paths, both traversal directions and their inversions. Nothing below can
    override it.
-3. **Smallest representation among equal LALAS.** Several traversals may read as the same
+4. **Smallest representation among equal LALAS.** Several traversals may read as the same
    LALAS; the one whose rendered ring-type string (heteroatom positions included) is
    lexicographically smallest, token by token, is kept.
-4. **Numbering direction.** Heteroatom positions are numbered in one direction for the
-   whole molecule, taken from the first angular annulation of the chosen traversal. This
+5. **Numbering direction.** Heteroatom positions are numbered in one direction for the
+   whole molecule (along or against the shared ring orientation of rule 2), taken from
+   the first angular annulation of the chosen traversal. This
    also holds when the LALAS reads the same from both ends (`ambiguous`, e.g. `AA`): each
-   traversal still fixes its own direction, and rule 3 picks between the traversals. Only
-   when the molecule has no angular annulation (all-`L`) does geometry leave the direction
-   open; then both are tried and the smaller token sequence is kept. Freeing the direction
+   traversal still fixes its own direction, and rule 4 picks between the traversals. Only
+   when the molecule has no angular annulation (all-`L`) is the direction left open; then both are tried and the smaller token sequence is kept. Freeing the direction
    in the `ambiguous` case used to merge distinct isomers, e.g. `fur[O:3],ben,ben,fur[O:1] AA`
    and `fur[O:1],ben,ben,fur[O:3] AA` both came out as the latter.
-5. **Forks of end rings.** At a branch point carrying two end rings, both orderings are
-   generated as candidate traversals and their annulation is computed from the geometry,
-   so rule 2 picks the layout. Because the two end rings lie on opposite sides, the
-   canonical string always shows `A` there, and the ring order inside the branch follows
-   the geometry rather than the lexicographic order of the ring types.
+6. **Forks of end rings.** At a branch point carrying two end rings, both orderings are
+   generated as candidate traversals and their annulation is computed as in rule 2, so
+   rule 3 picks the layout. Because the two end rings lie on opposite sides, the canonical
+   string always shows `A` there, and the ring order inside the branch follows the ring
+   topology rather than the lexicographic order of the ring types.
 
-Rules 2-5 make the output independent of the molecule's orientation: a molecule and its
-mirror image give the same representation. This matters in practice, since the alignment
-step (`Mol.align_to_xy_plane`) can produce either frame on different machines. The
-alignment takes the inertia tensor about the molecule's centroid, so the output also does
-not depend on where the molecule sits in the input frame (taking it about the origin, as
-earlier versions did, changed ~2% of representations when a molecule was shifted by 5 Å).
+Because rule 2 uses only the bond graph, and rules 3-6 consider both global orientations,
+the output does not depend on the coordinates at all: a molecule and its mirror image, or
+the same molecule rotated, translated or with its atoms listed in another order, give the
+same representation. The pipeline therefore does not align the molecule to a plane
+(`Mol.align_to_xy_plane` is kept for geometric analysis only).
 
 ### How this was verified
 
@@ -102,7 +111,7 @@ python verification/verify_representation.py --sample 2000
 ```
 
 It regenerates a random sample of molecules, requires each one to be unchanged when
-mirrored, and compares its ring-type counts against the feature table (skipping the
+mirrored with its atoms listed in a random order, and compares its ring-type counts against the feature table (skipping the
 self-contradicting rows described above). See the script's header for details.
 
 ## How to cite this work

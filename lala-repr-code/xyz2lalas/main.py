@@ -52,8 +52,6 @@ def main():
 
 def process_molecule(molrepr, covalency_factor=COVALENCY_FACTOR):
     """Run the full pipeline on one Mol and print its final sequence line."""
-    molrepr.align_to_xy_plane()
-
     knots, _ = knotidentifier.identify(molrepr, covalency_factor)
     assert len(knots) > 2, "\nNot enough knots found, need at least 3."
 

@@ -7,8 +7,9 @@ It is a BINARY tree, so it can only branch once each time.
 
 import copy
 import itertools
-import numpy as np
 import pandas as pd
+
+from . import topology
 
 
 class Node():
@@ -53,13 +54,14 @@ def compute_canonical_sequence(_paths, _edges, _knots, _graph):
     raw_sequences = []
     raw_trees = []
     raw_paths_idx = []
+    orientation = topology.ring_orientation(_knots)
 
     for path in find_longest_path(_paths, _graph):
         longest_path = [knot.index for knot in path.route]
         base = Node(longest_path[0])
         build_tree(base, copy.deepcopy(_edges))
         for root in _layout_variants(base, longest_path):
-            get_annulation(root, None, _knots, longest_path)
+            get_annulation(root, None, orientation, longest_path)
             raw_sequences.append(get_sequence(longest_path, root))
             raw_trees.append(root)
             raw_paths_idx.append(longest_path)
@@ -188,7 +190,12 @@ def build_tree(current_node, edges):
         build_tree(child, edges)
 
     
-def get_annulation(current_node, previous_node, _knots, _longest_path):
+def get_annulation(current_node, previous_node, _orientation, _longest_path):
+    """
+    Set ``annulation`` (0 L, 1 A, 2 a) on every node of the tree. The value
+    at a ring follows from which of its bonds are fused to the previous and
+    the next ring (``topology.turn``), never from coordinates.
+    """
     if len(current_node.children) < 1:
         return # nothing to do, found an end
 
@@ -196,14 +203,10 @@ def get_annulation(current_node, previous_node, _knots, _longest_path):
         if current_node.index in _longest_path:
             for child in current_node.children:
                 if child.index in _longest_path:
-                    if get_rotation(np.array(_knots[previous_node.index].get_coord()), # check which one
-                                    np.array(_knots[current_node.index].get_coord()), 
-                                    np.array(_knots[child.index].get_coord())) < 0:
-                        current_node.annulation = 1
-                    else: 
-                        current_node.annulation = 2
+                    current_node.annulation = _angular(
+                        _orientation, previous_node, current_node, child)
                 else: 
-                    get_annulation(child, current_node, _knots, _longest_path)
+                    get_annulation(child, current_node, _orientation, _longest_path)
         
         else:
             paths = []
@@ -219,35 +222,35 @@ def get_annulation(current_node, previous_node, _knots, _longest_path):
             # check if new main path is degenerate:
             if len(new_main_path) == 1:
                 for child in current_node.children:
-                    get_annulation(child, current_node, _knots, new_main_path)
+                    get_annulation(child, current_node, _orientation, new_main_path)
             elif len(new_main_path) > 1 and longest_path == 0:
                 # Fork of end rings: children[0] is the one written after the
                 # branch, so the turn towards it decides A/a, as on the main path.
-                if get_rotation(np.array(_knots[previous_node.index].get_coord()),
-                                np.array(_knots[current_node.index].get_coord()),
-                                np.array(_knots[current_node.children[0].index].get_coord())) < 0:
-                    current_node.annulation = 1
-                else:
-                    current_node.annulation = 2
+                current_node.annulation = _angular(
+                    _orientation, previous_node, current_node, current_node.children[0])
             else: print(f'Degenerate branching point with branches > 1! This case is not handled')
 
         for child in current_node.children:
-            get_annulation(child, current_node, _knots, _longest_path)
+            get_annulation(child, current_node, _orientation, _longest_path)
 
     else:
         if previous_node: # prevent this from being called on the root node
-            if get_angle(np.array(_knots[previous_node.index].get_coord()), 
-                         np.array(_knots[current_node.index].get_coord()), 
-                         np.array(_knots[current_node.children[0].index].get_coord())) < -0.87:
-                current_node.annulation = 0 # "L"
-            else:
-                if get_rotation(np.array(_knots[previous_node.index].get_coord()), 
-                                np.array(_knots[current_node.index].get_coord()), 
-                                np.array(_knots[current_node.children[0].index].get_coord())) < 0:
-                    current_node.annulation = 1
-                else:
-                    current_node.annulation = 2
-        get_annulation(current_node.children[0], current_node, _knots, _longest_path)
+            current_node.annulation = topology.turn(
+                _orientation, previous_node.index, current_node.index,
+                current_node.children[0].index)
+        get_annulation(current_node.children[0], current_node, _orientation, _longest_path)
+
+
+def _angular(orientation, previous_node, current_node, next_node):
+    """
+    Annulation at a branch point. Two fused neighbours of a ring cannot both
+    sit opposite the same bond, so with three of them the turn is always
+    angular; a linear reading here would mean an unexpected ring topology.
+    """
+    value = topology.turn(orientation, previous_node.index, current_node.index, next_node.index)
+    if value == 0:
+        raise ValueError(f"branch point at ring {current_node.index} reads as linear")
+    return value
 
 
 def get_sequence(path, current_node):
@@ -436,18 +439,3 @@ def print_longestPath(root):
         for child in node.children:
             rec_print(child)
     rec_print(root)
-
-
-def get_angle(a, b, c):
-
-    ba = a - b
-    bc = c - b
-
-    return np.dot(ba, bc) / (np.linalg.norm(ba) * np.linalg.norm(bc))
-
-def get_rotation(a, b, c):
-
-    ba = a - b
-    bc = c - b
-
-    return int(np.sign(np.cross(ba,bc)[2]))
