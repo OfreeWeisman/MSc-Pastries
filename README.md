@@ -67,7 +67,10 @@ numbering.
 
 Rules 2-5 make the output independent of the molecule's orientation: a molecule and its
 mirror image give the same representation. This matters in practice, since the alignment
-step (`Mol.align_to_xy_plane`) can produce either frame on different machines.
+step (`Mol.align_to_xy_plane`) can produce either frame on different machines. The
+alignment takes the inertia tensor about the molecule's centroid, so the output also does
+not depend on where the molecule sits in the input frame (taking it about the origin, as
+earlier versions did, changed ~2% of representations when a molecule was shifted by 5 Å).
 
 ### How this was verified
 

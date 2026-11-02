@@ -44,17 +44,19 @@ class Mol:
 
         """
 
-        I = np.zeros((3,3)) # set up inertia tensor I
-        com = np.zeros(3) # set up center of mass com
+        # Centroid (unit masses, matching the inertia tensor below). The
+        # tensor must be taken about it: about the origin, the principal
+        # axes - and so the projection used for every annulation angle -
+        # would depend on where the molecule happens to sit in the input
+        # frame, and a plain translation could change the representation.
+        com = np.mean([[atom.x, atom.y, atom.z] for atom in self.atoms], axis=0)
 
-        # calculate moment of inertia tensor I
+        I = np.zeros((3,3)) # set up inertia tensor I about the centroid
         for atom in self.atoms:
-            I += np.array([[(atom.y**2+atom.z**2),-atom.x*atom.y       ,-atom.x*atom.z],
-                            [-atom.x*atom.y       ,(atom.x**2+atom.z**2),-atom.y*atom.z],
-                            [-atom.x*atom.z       ,-atom.y*atom.z       ,atom.x**2+atom.y**2]])
-
-            com += [atom.x, atom.y, atom.z]
-        com = com/len(com)
+            x, y, z = atom.x - com[0], atom.y - com[1], atom.z - com[2]
+            I += np.array([[(y**2+z**2), -x*y       , -x*z       ],
+                           [-x*y       , (x**2+z**2), -y*z       ],
+                           [-x*z       , -y*z       , x**2+y**2  ]])
 
         # extract eigenvalues and eigenvectors for I
         # np.linalg.eigh(I)[0] are eigenValues, [1] are eigenVectors
