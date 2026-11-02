@@ -134,8 +134,28 @@ def _resolve(final_seq, raw_sequences, raw_paths_idx, ring_type_for_idx,
     chosen_idx, match_type = candidates[0]
     if render is not None:
         chosen_idx, match_type = min(
-            candidates, key=lambda c: render(c[0], label_for(c[1])))
+            candidates,
+            key=lambda c: render(c[0], numbering_label(label_for(c[1]), c[1])))
     return label_for(match_type), chosen_idx, match_type
+
+
+def numbering_label(label, match_type):
+    """
+    Return the label that fixes the heteroatom numbering direction for a
+    traversal of the given ``match_type``.
+
+    'ambiguous' only says that the molecule reads the same from both ends;
+    each individual traversal is still direct or inverted, and that fixes
+    its numbering direction exactly as for a chiral molecule. Freeing the
+    direction there would let one end's heteroatom positions be mirrored
+    independently of the geometry, so e.g. ``fur[O:3],ben,ben,fur[O:1] AA``
+    and ``fur[O:1],ben,ben,fur[O:3] AA`` (two different molecules) would
+    both collapse to the latter. Only 'none' (no angular annulation at
+    all) leaves the direction genuinely open.
+    """
+    if label == 'ambiguous':
+        return 'clockwise' if match_type == 'direct' else 'counter-clockwise'
+    return label
 
 
 def _label_rule(has_angular, direct, inverted, ring_type_for_idx):

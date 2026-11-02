@@ -52,9 +52,13 @@ numbering.
    LALAS; the one whose rendered ring-type string (heteroatom positions included) is
    lexicographically smallest, token by token, is kept.
 4. **Numbering direction.** Heteroatom positions are numbered in one direction for the
-   whole molecule, taken from the first angular annulation. When the molecule has none
-   (all-`L`) or is symmetric (`ambiguous`), geometry does not fix a direction, so both are
-   tried and the smaller token sequence is kept.
+   whole molecule, taken from the first angular annulation of the chosen traversal. This
+   also holds when the LALAS reads the same from both ends (`ambiguous`, e.g. `AA`): each
+   traversal still fixes its own direction, and rule 3 picks between the traversals. Only
+   when the molecule has no angular annulation (all-`L`) does geometry leave the direction
+   open; then both are tried and the smaller token sequence is kept. Freeing the direction
+   in the `ambiguous` case used to merge distinct isomers, e.g. `fur[O:3],ben,ben,fur[O:1] AA`
+   and `fur[O:1],ben,ben,fur[O:3] AA` both came out as the latter.
 5. **Forks of end rings.** At a branch point carrying two end rings, both orderings are
    generated as candidate traversals and their annulation is computed from the geometry,
    so rule 2 picks the layout. Because the two end rings lie on opposite sides, the
