@@ -101,9 +101,6 @@ Invariance and stability:
   molecules where `a` became `A` (796 molecules contain such a fork). No other LALAS in the
   dataset changed, and no change at a non-fork position occurred.
 
-`data/results/manual_check_sample.csv` holds 10 randomly selected molecules per category
-(each fix plus unchanged molecules) with formula and SMILES, for manual spot checks.
-
 Both automated checks are kept as a regression test:
 
 ```bash
